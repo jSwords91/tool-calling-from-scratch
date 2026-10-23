@@ -1,5 +1,6 @@
 """Tool calling from scratch: a small Gemma, a hand-written prompt, a parser and a loop."""
 import os
+import re
 
 # Every generation step re-reads a slightly longer sequence, so GPU buffers grow
 # a little each token. Without this, PyTorch's cache keeps reserving fresh blocks
@@ -48,21 +49,27 @@ def load():
     return model.to(DEVICE).eval(), tokenizer
 
 
+# The tokens FunctionGemma stops on. <start_function_response> is the interesting
+# one: having written a tool call, the model writes it to say "run that, I'll wait".
+STOP = ("<end_of_turn>", "<start_function_response>", "<eos>")
+
+
 @torch.no_grad()
 def generate(model, tokenizer, prompt, max_new_tokens=256):
     """Greedy decoding: run the whole sequence through the model, append the likeliest
-    next token, repeat until <end_of_turn>. There is no KV cache, so every step
-    re-reads the whole sequence: slow, but nothing is hidden."""
+    next token, repeat until a stop token. There is no KV cache, so every step
+    re-reads the whole sequence: slow, but nothing is hidden.
+    Returns the new text and the stop token that ended it."""
     ids = tokenizer.encode(prompt)
-    stop = tokenizer.tokenizer.token_to_id("<end_of_turn>")
+    stops = {tokenizer.tokenizer.token_to_id(s): s for s in STOP}
     new = []
     for _ in range(max_new_tokens):
         logits = model(torch.tensor([ids + new], device=DEVICE))
         next_id = logits[0, -1].argmax().item()
-        if next_id == stop:
-            break
+        if next_id in stops:
+            return tokenizer.decode(new), stops[next_id]
         new.append(next_id)
-    return tokenizer.decode(new)
+    return tokenizer.decode(new), None
 
 
 def declare(tool):
@@ -90,6 +97,14 @@ def system_turn(tools):
     return f"<start_of_turn>developer\n{instruction}{''.join(declare(t) for t in tools)}<end_of_turn>\n"
 
 
+def parse_calls(text):
+    """Pull the tool calls out of the model's text, e.g.
+    <start_function_call>call:get_weather{city:<escape>London<escape>}<end_function_call>
+    becomes ("get_weather", {"city": "London"})."""
+    calls = re.findall(r"<start_function_call>call:(\w+)\{(.*?)\}<end_function_call>", text, re.S)
+    return [(name, dict(re.findall(r"(\w+):<escape>(.*?)<escape>", args, re.S))) for name, args in calls]
+
+
 def main():
     model, tokenizer = load()
     prompt = system_turn(TOOLS)  # the whole conversation is this one string
@@ -100,8 +115,10 @@ def main():
         except (EOFError, KeyboardInterrupt):
             return
         prompt += f"<start_of_turn>user\n{user}<end_of_turn>\n<start_of_turn>model\n"
-        reply = generate(model, tokenizer, prompt)
-        print(reply)
+        reply, stop = generate(model, tokenizer, prompt)
+        print(reply + (stop or ""))
+        for name, args in parse_calls(reply):
+            print(f"-> the program reads a tool call: {name}({args})")
         prompt += reply + "<end_of_turn>\n"
 
 

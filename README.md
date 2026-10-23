@@ -1,13 +1,8 @@
 # Tool calling from scratch
 
-People talk about LLMs "calling tools", but a language model only ever predicts
-the next token. So what's actually going on?
-
-In short, the model never calls anything. The tools are described in the prompt
-as text, the model writes a tool call as text, and a normal program reads that
-text, runs the function and writes the result back into the prompt. I wanted to
-build every piece of that by hand, with a model small enough to see all the way
-through:
+An explainer repo showing how LLMs "call tools". The model only ever writes text:
+a normal program reads the tool call out of it, runs the function and writes the
+result back into the prompt. Every piece is built by hand:
 
 - **The model** - Gemma 3 270M in plain PyTorch, taken from my
   [lets-build-llms](https://github.com/jSwords91/lets-build-llms) repo, with the
@@ -18,8 +13,6 @@ through:
   pulled out of the text.
 - **The loop** - the program runs the function, adds the result, and hands back
   to the model to finish its answer.
-
-This is for learning, not for production.
 
 ## Quickstart
 

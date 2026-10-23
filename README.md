@@ -1,8 +1,7 @@
 # Tool calling from scratch
 
-An explainer repo showing how LLMs "call tools". The model only ever writes text:
-a normal program reads the tool call out of it, runs the function and writes the
-result back into the prompt. Every piece is built by hand:
+An explainer for clients on how LLMs "call tools": the model only writes text,
+and a normal program runs the tool. Every piece is built by hand:
 
 - **The model** - Gemma 3 270M in plain PyTorch, taken from my
   [lets-build-llms](https://github.com/jSwords91/lets-build-llms) repo, with the

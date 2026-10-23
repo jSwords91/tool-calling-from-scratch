@@ -41,6 +41,19 @@ TOOLS = [
 ]
 
 
+# The Python functions behind the tools. The model never runs these: it writes
+# text asking for them, and the program below does the running.
+def get_weather(city):
+    return f"15C and light rain in {city}"  # pretend weather; a real API call would go here
+
+
+def list_files(path):
+    return "\n".join(sorted(os.listdir(path)))
+
+
+FUNCTIONS = {"get_weather": get_weather, "list_files": list_files}
+
+
 def load():
     """Build the model from scratch, then pour FunctionGemma's weights into it."""
     model = Gemma3Model(ModelConfig())
@@ -115,11 +128,25 @@ def main():
         except (EOFError, KeyboardInterrupt):
             return
         prompt += f"<start_of_turn>user\n{user}<end_of_turn>\n<start_of_turn>model\n"
-        reply, stop = generate(model, tokenizer, prompt)
-        print(reply + (stop or ""))
-        for name, args in parse_calls(reply):
-            print(f"-> the program reads a tool call: {name}({args})")
-        prompt += reply + "<end_of_turn>\n"
+        # The loop: generate; if the model stopped to wait for tools, run them, write
+        # the results into the prompt and generate again, until it ends its turn.
+        while True:
+            reply, stop = generate(model, tokenizer, prompt)
+            prompt += reply
+            print(reply, end="")
+            calls = parse_calls(reply)
+            if stop != "<start_function_response>" or not calls:
+                prompt += "<end_of_turn>\n"
+                print(stop or "")
+                break
+            for name, args in calls:
+                try:
+                    result = FUNCTIONS[name](**args)
+                except Exception as e:  # unknown tool, bad arguments, missing directory...
+                    result = f"Error: {e!r}"
+                response = f"<start_function_response>response:{name}{{value:<escape>{result}<escape>}}<end_function_response>"
+                prompt += response
+                print(f"\033[36m{response}\033[0m", end="")  # cyan: written by the program, not the model
 
 
 if __name__ == "__main__":

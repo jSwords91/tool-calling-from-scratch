@@ -32,7 +32,37 @@ uv run python tool_calling.py
 ```
 
 The first run downloads about 512MB of weights. It uses your GPU if there is
-one, otherwise the CPU.
+one, otherwise the CPU (much slower).
+
+It prints the prompt the model starts from, then waits for you. Try
+`What's the weather in London?` or `What files are in /tmp?`. It is a 270M
+model, so keep requests simple and paths short.
+
+## What actually happens
+
+Ask about the weather and this is the text, token for token, after the
+program's work (cyan in the terminal) is added:
+
+```
+<start_of_turn>user
+What's the weather in London?<end_of_turn>
+<start_of_turn>model
+<start_function_call>call:get_weather{city:<escape>London<escape>}<end_function_call>
+<start_function_response>response:get_weather{value:<escape>15C and light rain in London<escape>}<end_function_response>
+The current weather in London is 15°C with light rain.<end_of_turn>
+```
+
+1. The model writes `call:get_weather{...}`, then the token
+   `<start_function_response>`, and stops. That token is its way of saying
+   "run this, I'll wait".
+2. The program reads the call out of the text, runs `get_weather("London")`,
+   and writes the result in the same format.
+3. The model is run again on the longer text and finishes its answer, now
+   knowing the weather.
+
+That is all "calling a tool" is: the model writes text, a program acts on it.
+(The line breaks around the function call and response are added here for
+reading; in the real text they run on.)
 
 ## Reading guide
 

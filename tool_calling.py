@@ -118,10 +118,25 @@ def parse_calls(text):
     return [(name, dict(re.findall(r"(\w+):<escape>(.*?)<escape>", args, re.S))) for name, args in calls]
 
 
+def dim_tokens(text):
+    """Dim the special tokens so the readable text stands out (display only)."""
+    return re.sub(r"(<[a-z_]+>)", "\033[2m\\1\033[22m", text)
+
+
+def show(who, text):
+    """Print a piece of the conversation, labelled by who wrote it."""
+    colour = {"model": "32", "program": "36"}[who]  # green for the model, cyan for the program
+    text = dim_tokens(text).replace("\n", "\n" + " " * 9)  # keep multi-line results aligned
+    print(f"\033[1;{colour}m{who:>7}\033[0m  \033[{colour}m{text}\033[0m")
+
+
 def main():
     model, tokenizer = load()
     prompt = system_turn(TOOLS)  # the whole conversation is this one string
-    print(prompt)  # this is everything the model knows about its tools
+    # Show everything the model knows about its tools, one declaration per line for reading.
+    readable = prompt.replace("<start_function_declaration>", "\n  <start_function_declaration>")
+    print("The model starts with this prompt (the tools are just text in it):")
+    print(dim_tokens(readable.replace("<end_of_turn>", "\n<end_of_turn>")))
     while True:
         try:
             user = input("> ")
@@ -133,12 +148,13 @@ def main():
         while True:
             reply, stop = generate(model, tokenizer, prompt)
             prompt += reply
-            print(reply, end="")
             calls = parse_calls(reply)
             if stop != "<start_function_response>" or not calls:
                 prompt += "<end_of_turn>\n"
-                print(stop or "")
+                show("model", reply + (stop or ""))
+                print()
                 break
+            show("model", reply)
             for name, args in calls:
                 try:
                     result = FUNCTIONS[name](**args)
@@ -146,7 +162,7 @@ def main():
                     result = f"Error: {e!r}"
                 response = f"<start_function_response>response:{name}{{value:<escape>{result}<escape>}}<end_function_response>"
                 prompt += response
-                print(f"\033[36m{response}\033[0m", end="")  # cyan: written by the program, not the model
+                show("program", response)
 
 
 if __name__ == "__main__":

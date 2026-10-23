@@ -36,7 +36,7 @@ made-up weather, but `list_files` is real.)
 ## What actually happens
 
 Here's the full text after asking about the weather. The response line is
-written by the program (it shows up cyan in the terminal), everything after
+written by the program (labelled `program` in the terminal), everything after
 `<start_of_turn>model` apart from that is written by the model:
 
 ```

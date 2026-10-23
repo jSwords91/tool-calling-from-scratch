@@ -19,6 +19,21 @@ hand, with a small model we can see all the way through:
 
 For pedagogical purposes only.
 
+## Quickstart
+
+You need [uv](https://docs.astral.sh/uv/) and a Hugging Face account.
+FunctionGemma is gated: accept the licence on its
+[model page](https://huggingface.co/google/functiongemma-270m-it), then log in
+with `uv run hf auth login` (or set `HF_TOKEN`).
+
+```sh
+uv sync
+uv run python tool_calling.py
+```
+
+The first run downloads about 512MB of weights. It uses your GPU if there is
+one, otherwise the CPU.
+
 ## Reading guide
 
 The git history is the tutorial. Each commit adds one idea:
